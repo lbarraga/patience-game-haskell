@@ -32,7 +32,7 @@ main = putStrLn hoi
 
 -- === RenderFuncties ===
 
-renderCard :: Card -> Picture
+-- renderCard :: Card -> Picture
 
 --main :: IO ()
 --main = play white fps initBoard render handleInput step
