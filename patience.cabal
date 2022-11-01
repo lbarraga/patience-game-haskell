@@ -7,7 +7,7 @@ build-type:     Simple
 library
   hs-source-dirs: lib
   build-depends: base >= 4.7 && <5
-  exposed-modules: VoorbeeldModule
+  exposed-modules: VoorbeeldModule, Types
 
 executable patience
   main-is: Main.hs

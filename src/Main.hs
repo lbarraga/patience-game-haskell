@@ -1,4 +1,5 @@
 import VoorbeeldModule (hoi, hallo)
+import Types
 import Graphics.Gloss.Interface.IO.Game
 import Graphics.Gloss
 
@@ -27,12 +28,50 @@ pxlHeight = 100
 windowPosition :: (Int, Int)
 windowPosition = (200, 200)
 
+-- Initiele opstelling van de game
+initGame :: Game
+initGame = undefined
+
 main :: IO ()
 main = putStrLn hoi
 
 -- === RenderFuncties ===
 
--- renderCard :: Card -> Picture
+-- Render een kaart
+renderCard :: Card -> Picture
+renderCard = undefined
+
+-- Render een enkele stapel
+renderStack :: Stack -> Picture
+renderStack = undefined
+
+-- Render de game
+renderGame :: Game -> Picture
+renderGame = undefined
+
+-- Render de selector
+renderSelector :: Selector -> Picture
+renderSelector = undefined
+
+-- Render het bord
+renderBoard :: Board -> Picture
+renderBoard = undefined
+
+-- Render de stapels over heel de game
+renderGameStacks :: [Stack] -> Picture
+renderGameStacks = undefined
+
+-- Render de ending stapels
+renderEndingstacks :: [Stack] -> Picture
+renderEndingstacks = undefined
+
+-- Render de afhaalstapel
+renderPile :: Stack -> Picture
+renderPile = undefined
+
+-- stap in de game
+step :: Float -> Game -> Game
+step _ game = game
 
 --main :: IO ()
---main = play white fps initBoard render handleInput step
+--main = play white fps initGame renderGame handleInput step
