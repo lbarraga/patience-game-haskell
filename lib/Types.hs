@@ -9,7 +9,14 @@ data CardType = Clubs
               | Hearts
               | Spades
               | NoneType
-              deriving (Show, Enum, Eq)
+              deriving (Enum, Eq)
+
+instance Show CardType where
+    show Clubs    = "club"
+    show Diamonds = "diamond"
+    show Hearts    = "heart"
+    show Spades   = "spade"
+    show NoneType = "nonetype"
 
 -- De waarden van de kaarten.
 data CardValue = Ace
@@ -26,7 +33,23 @@ data CardValue = Ace
                | Queen
                | King
                | NoneValue
-               deriving (Show, Enum, Eq)
+               deriving (Enum, Eq)
+
+instance Show CardValue where
+    show Ace   = "A"
+    show Two   = "2"
+    show Three = "3"
+    show Four  = "4"
+    show Five  = "5"
+    show Six   = "6"
+    show Seven = "7"
+    show Eight = "8"
+    show Nine  = "9"
+    show Ten   = "10"
+    show Jack  = "J"
+    show Queen = "Q"
+    show King  = "K"
+    show NoneValue = "N"
 
 -- De status van een kaart.
 -- Een kaart kan ofwel verborgen zijn, ofwel open liggen.
