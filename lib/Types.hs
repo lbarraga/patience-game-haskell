@@ -55,7 +55,8 @@ instance Show CardValue where
 -- Een kaart kan ofwel verborgen zijn, ofwel open liggen.
 data CardStatus = Hidden
                 | Visible
-                deriving (Show)
+                | NoneStatus
+                deriving (Show, Eq)
 
 -- Een kaart heeft een type, een waarde en een status.
 type Card = (CardType, CardValue, CardStatus)
