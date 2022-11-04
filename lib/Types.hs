@@ -1,7 +1,16 @@
 module Types where
 
+-- TOEVOEGING: De regios van een patience game, wordt enkel gebruikt om de `Coordinate` te verduidelijken
+data Region = GameField 
+            | Pile 
+            | EndingStacks 
+            deriving (Show, Eq)
+
 -- Een positie op het speelveld.
-type Coordinate = (Int, Int)
+-- Region: GameField    -> x = stacknr, y = kaart op stack, vanaf boven
+-- Region: Pile         -> x en y doen er niet toe, want er is maar 1 pile
+-- Region: EndingStacks -> x = stacknr, y doet er niet toe
+type Coordinate = (Region, Int, Int)
 
 -- De kleuren van de kaarten.
 data CardType = Clubs
@@ -14,7 +23,7 @@ data CardType = Clubs
 instance Show CardType where
     show Clubs    = "club"
     show Diamonds = "diamond"
-    show Hearts    = "heart"
+    show Hearts   = "heart"
     show Spades   = "spade"
     show NoneType = "nonetype"
 
@@ -75,7 +84,7 @@ data Board = Board {
 } deriving (Show)
 
 -- De richting waarin de selector kan bewegen.
-data Direction = U | D | L | R deriving (Show)
+data Direction = U | D | L | R deriving (Show, Eq)
 
 -- De selector van het spel.
 data Selector = Selector {
