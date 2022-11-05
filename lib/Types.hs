@@ -70,6 +70,8 @@ data CardStatus = Hidden
 -- Een kaart heeft een type, een waarde en een status.
 type Card = (CardType, CardValue, CardStatus)
 
+data CardColor = Black | Red deriving (Eq, Show)
+
 -- Een stapel kaarten.
 type Stack = [Card]
 
@@ -84,7 +86,13 @@ data Board = Board {
 } deriving (Show)
 
 -- De richting waarin de selector kan bewegen.
-data Direction = U | D | L | R deriving (Show, Eq)
+type Direction = (Int, Int)
+
+left, right, up, down :: (Int, Int)
+left  = (-1,  0)
+right = ( 1,  0)
+up    = ( 0, -1)
+down  = ( 0,  1)
 
 -- De selector van het spel.
 data Selector = Selector {

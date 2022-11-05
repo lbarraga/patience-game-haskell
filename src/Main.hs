@@ -1,9 +1,11 @@
-import VoorbeeldModule (hoi, hallo)
+import PatienceLogica
 import Types
 import Graphics.Gloss.Interface.IO.Game
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import Data.Maybe (fromJust, isNothing)
+import Control.Exception
+import Control.Concurrent (waitQSem)
 
 -- ===============================================================
 -- Main module: deze module heeft als doel de gegenereerde
@@ -34,12 +36,12 @@ pxlImageWidth :: Float
 pxlImageWidth = 100
 
 -- aantal pixels een kaart naar onder geschoven wordt na zijn voorganger op de stapel
-pxlVerticalStackInset :: Float
-pxlVerticalStackInset = 25
+pxlVertStackInset :: Float
+pxlVertStackInset = 25
 
 -- aantal pixels tussen de stapels op het speelveld
-pxlHorizontalStackInset :: Float
-pxlHorizontalStackInset = 5
+pxlHorStackInset :: Float
+pxlHorStackInset = 5
 
 --Initiele positie van het Gloss venster.
 windowPosition :: (Int, Int)
@@ -57,90 +59,19 @@ backgroundColor = makeColorI 221 160 221 1 -- Plum: Paars-achtige haskell kleur
 window :: Display
 window = InWindow "Patience" (pxlWidth, pxlHeight) windowPosition
 
--- TODO move
--- | Alle kaarten
-allCards :: [Card]
-allCards = [(cardType, cardValue, Hidden) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]]
-
--- Aantal ending stacks
-aantalEndingStacks :: Int
-aantalEndingStacks = 4
-
--- TODO move 
--- de placeholder kaart
-placeholderCard :: Card
-placeholderCard = (NoneType, NoneValue, NoneStatus)
-
--- TODO move
--- Het aantal oplopende stapels op het speelveld
-aantalSpeelVeldStapels :: Int
-aantalSpeelVeldStapels = 7
-
--- TODO move
--- Het aantal kaarten op het speelveld
-aantalSpeelVeldKaarten :: Int
-aantalSpeelVeldKaarten = n*(n+1) `div` 2 -- som van eerste n getallen 
-    where n = aantalSpeelVeldStapels
-
--- TODO move
--- De initiele kaarten op het SpeelVeld
-initGameField :: [Stack]
-initGameField = makeGameField (take aantalSpeelVeldKaarten allCards) aantalSpeelVeldStapels
-
--- TODO move 
--- De initiele kaarten op de pile (kaarten die overgehouden zijn na het nemen van de speelVeldKaarten)
-initPile :: Stack
-initPile = showLast $ drop aantalSpeelVeldKaarten allCards
-
--- TODO move
--- de initiele kaarten op de endingstacks
-initEndingStacks :: [Stack]
-initEndingStacks = replicate aantalEndingStacks [placeholderCard]
-
--- TODO move
--- Initiele opstelling van het bord
-initBoard :: Board
-initBoard = Board {
-    gameStacks = initGameField,
-    pile = initPile,
-    endingStacks = initEndingStacks
-}
-
--- TODO move
--- Initiele staat van de selector.
-initSelector :: Selector
-initSelector = Selector {position = (Pile, 2, 3), selected = Just (GameField, 5, 4)}
-
--- TODO move
--- Initiele opstelling van de game
-initGame :: Game
-initGame = Game {board = initBoard, selector = initSelector}
-
-
 -- === HulpFuncties ===
 
--- Zoek de picture van een kaart op + nog twee default gevallen
-lookUp :: [(Card, Picture)] -> Picture -> Picture -> Card -> Picture
-lookUp _ _ placeHolderPicture (NoneType, NoneValue, NoneStatus) = placeHolderPicture
-lookUp _ backPicture _ (_, _, Hidden) = backPicture
-lookUp table _ _  findCard = fromJust picture 
-    where picture = lookup findCard table -- ! lookup zonder hoofdletter uit Prelude !
-
--- TODO naar een andere file brengen
--- Maak stapels van oplopende grootte: van 1, 2, ..., tot grootte maxPile
-makeGameField :: [Card] -> Int -> [Stack]
-makeGameField cards 0 = []
-makeGameField cards maxPile = makeGameField (drop maxPile cards) (maxPile - 1) ++ [showLast $ take maxPile cards]
-
--- TODO andere file
--- show last card in a stack
-showLast :: Stack -> Stack
-showLast stack = init stack ++ [(t, v, Visible)] where (t, v, _) = last stack
+-- Zoek de picture van een kaart op. backpicture wanneer kaart niet gevonden.
+lookUp :: [(Card, Picture)] -> Picture -> Card -> Picture
+lookUp table backPicture findCard 
+  | isNothing picture = backPicture
+  | otherwise         = fromJust picture 
+  where picture = lookup findCard table -- ! lookup zonder hoofdletter uit Prelude !
 
 -- Zet de zelfgedefinieerde `Coordinate` om in een `GlossCoordinate`
 coordinate2Gloss :: Coordinate -> GlossCoordinate
-coordinate2Gloss (GameField, x, y)    = ((-300) + (pxlImageWidth + pxlHorizontalStackInset) * fromIntegral x, -pxlVerticalStackInset * fromIntegral y)
-coordinate2Gloss (EndingStacks, x, _) = (15 + (pxlImageWidth + pxlHorizontalStackInset) * fromIntegral x, 150)
+coordinate2Gloss (GameField, x, y)    = ((-300) + (pxlImageWidth + pxlHorStackInset) * fromIntegral x, -pxlVertStackInset * fromIntegral y)
+coordinate2Gloss (EndingStacks, x, _) = (15 + (pxlImageWidth + pxlHorStackInset) * fromIntegral x, 150)
 coordinate2Gloss (Pile, _, _)         = (-300, 150)
 
 -- Krijgt een kaart en geeft het pad van de foto van die kaart terug.
@@ -149,63 +80,126 @@ toPath (cardType, cardValue, _) = assetFolder ++ "/" ++ fotoMap ++ "/" ++ image
     where fotoMap = show cardType ++ "s"
           image   = show cardType ++ "-" ++ show cardValue ++ ".png"
 
+-- f [a1, a2, a3, ...] -> [a1, f a2, f (f a3), ...]
+cumulateF :: (a -> a) -> [a] -> [a] 
+cumulateF f [] = []
+cumulateF f (x:xs) = x : cumulateF f (map f xs)
+
 -- Verschuift de eerste picture niet, de tweede met (x, y), de derde met (2x, 2y), ...
-transLateCumulative :: Float -> Float -> [Picture] -> [Picture]
-transLateCumulative _ _ [] = []
-transLateCumulative x y (pic:rest) = pic : transLateCumulative x y (map (translate x y) rest)
+translateCumulative :: Float -> Float -> [Picture] -> [Picture]
+translateCumulative x y = cumulateF (translate x y)
 
 -- Hulpfunctie die nagaat of een bepaalde toets is ingedrukt.
 isKey :: SpecialKey -> Event -> Bool
 isKey k1 (EventKey (SpecialKey k2) Down _ _) = k1 == k2
 isKey _  _                                   = False
 
-dirToDelta :: Direction -> (Int, Int) -- TODO geen direction maar gewoon tuple
-dirToDelta L = (-1,  0)
-dirToDelta R = ( 1 , 0)
-dirToDelta U = ( 0 ,-1)
-dirToDelta D = ( 0 , 1)
-
--- TODO move
-canMove :: Coordinate -> Direction -> Bool
-canMove (Pile, _, _)         dir = dir /= U && dir /= L
-canMove (EndingStacks, _, _) dir = dir /= U && dir /= R
-canMove (GameField, x, 0)    U   = True
-canMove (GameField, x, y)    dir = (x + dx) `elem` [0..aantalSpeelVeldStapels] && (y + dy) `elem` [0..cardsOnStack]
-    where (dx, dy) = dirToDelta dir
-          cardsOnStack = x + dx + 1
-
-canSelectorMove :: Selector -> Direction -> Bool
-canSelectorMove s@Selector{position = p} = canMove p
-
--- TODO move
-moveSelectorPos :: Coordinate -> Direction ->  Coordinate
-moveSelectorPos (GameField, x, 0) U -- Zit op de eerste kaarten, een druk naar boven brengt je naar de EndingStacks
-  | x >= 3    = (EndingStacks, x, 0)
-  | otherwise = (Pile, 0, 0)
-moveSelectorPos (Pile, _, _) R = (EndingStacks, 0, 0)
-moveSelectorPos (EndingStacks, 0, _) L = (Pile, 0, 0)
-moveSelectorPos (Pile, _, _) D = (GameField, 0, 0)
-moveSelectorPos (EndingStacks, x, _) D = (GameField, x + 3, 0) -- TODO constanten weg
-moveSelectorPos (region, x, y) dir = (region, x + dx, y + dy)
-    where (dx, dy) = dirToDelta dir
-
+-- Move de selector 
 moveSelector :: Selector -> Direction -> Selector
 moveSelector s@Selector{position = p} dir = s{position = moveSelectorPos p dir}
 
+-- move de selector van de game
 move :: Game -> Direction -> Game
 move g@Game{selector = s} dir = g{selector = moveSelector s dir}
 
--- === RenderFuncties ===
+-- Is een kaart omgedraaid
+isCardVisible :: Card -> Bool
+isCardVisible (_, _, status) = status == Visible
 
--- Render een kaart
-renderCard :: Card -> IO (Maybe Picture)
-renderCard (NoneType, NoneValue, NoneStatus) = loadJuicyPNG $ assetFolder ++ "/placeholder.png"
-renderCard (_, _, Hidden)                    = loadJuicyPNG $ assetFolder ++ "/back.png"
-renderCard card                              = loadJuicyPNG $ toPath card
+-- TODO move
+selectCard :: Game -> Game
+selectCard g@Game{selector = s@Selector{position = p}} = g{selector = s{selected = Just p}}
+
+-- TODO move
+-- Geeft aan of een kaart geselecteerd kan worden of niet.
+-- Dit is het gavel als de kaart omgedraaid is en hij op het speelveld ligt.
+canSelectCard :: Game -> Bool
+canSelectCard g = canSelectPosition ((position . selector) g) g
+
+canSelectPosition :: Coordinate -> Game -> Bool
+canSelectPosition (Pile, _, _)         g = (not . null . pile . board) g
+canSelectPosition (EndingStacks, x, _) g = (not . null) ((endingStacks . board) g !! x)
+canSelectPosition (GameField, x, y)    g = isCardVisible card
+    where card = cardStack !! y
+          cardStack = (gameStacks  . board) g !! x
+
+handleGameSelection :: Game -> Game
+handleGameSelection g = handleSelection maybeSelected selectorPos g
+      where maybeSelected = (selected . selector) g
+            selectorPos   = (position . selector) g
+
+-- Selecteerd een kaart indien er nog geen geselecteerd werd, 
+-- verplaats anders alle kaarten vanaf selected naar de selector
+handleSelection :: Maybe Coordinate -> Coordinate -> Game -> Game
+handleSelection Nothing selectorPos = selectCard 
+handleSelection (Just selectedPos) selectorPos = deselect . moveSubStack selectedPos selectorPos
+
+deselect :: Game -> Game
+deselect g@Game{selector = s} = g{selector = s{selected = Nothing}}
+
+-- TODO move
+-- Neem de kaart en alle bovenliggende op een bepaalde positie en plaats ze op een andere positie
+-- Mogelijke verplaatsingen zijn
+--  * GameField    -> GameField | EndingStacks
+--  * Pile         -> GameField | EndingStacks
+--  * EndingStacks -> GameField
+canMoveRegion :: Region -> Region -> Bool
+canMoveRegion EndingStacks EndingStacks = False -- Kan in principe maar waarom zou je.
+canMoveRegion _ Pile = False -- Je kan geen kaarten op de Pile leggen.
+canMoveRegion _ _ = True
+
+getCardColor :: Card -> CardColor
+getCardColor (Hearts  , _, _) = Red
+getCardColor (Diamonds, _, _) = Red
+getCardColor _ = Black
+
+getCardValue :: Card -> Int
+getCardValue (_, value, _) = fromEnum value
+
+canMoveOnto :: Card -> Card -> Bool
+canMoveOnto c1 c2 = colorsDifferent && oneLower
+    where colorsDifferent = getCardColor c1 /= getCardColor c2
+          oneLower = getCardValue c2 == getCardValue c2 - 1
+
+moveSubStack :: Coordinate -> Coordinate -> Game -> Game
+moveSubStack from to g@Game{board = b} = g{board = newBoard}
+    where newBoard = boardAfterPlacingStack to removed removedBoard
+          (removed, removedBoard) = takeStackAction from b 
+
+-- Verwijder een substapel kaarten van het bord,
+-- geeft de substapel terug en het bord na de verwijder actie
+takeStackAction :: Coordinate -> Board -> (Stack, Board)
+takeStackAction co b = (takeStack co b, boardAfterRemove co b)
+
+takeStack :: Coordinate -> Board -> Stack
+takeStack (Pile, _, _)         b = [last $ pile b]
+takeStack (EndingStacks, x, _) b = [last $ endingStacks b !! x]
+takeStack (GameField, x, y)    b = drop y (gameStacks b !! x)
+
+boardAfterRemove :: Coordinate -> Board -> Board
+boardAfterRemove (Pile, _, _)         b = b{pile = (showLast . init) $ pile b}
+boardAfterRemove (EndingStacks, x, _) b = b{endingStacks = replaceStack x stacks newEndingStack}
+    where newEndingStack = (showLast . init) (stacks !! x) -- laatste is weg
+          stacks = endingStacks b
+boardAfterRemove (GameField, x, y)    b = b{gameStacks = replaceStack x stacks newGameStack}
+    where newGameStack = (showLast . take y) (stacks !! x) -- alle kaarten vanaf co y zijn weg 
+          stacks = gameStacks b
+
+boardAfterPlacingStack :: Coordinate ->  Stack -> Board -> Board
+boardAfterPlacingStack (EndingStacks, x, _) s b = b{endingStacks = replaceStack x stacks newEndingStack }
+    where newEndingStack = stacks !! x ++ s
+          stacks = endingStacks b
+boardAfterPlacingStack (GameField, x, _) s b = b{gameStacks = replaceStack x stacks newGameStack}
+    where newGameStack = stacks !! x ++ s
+          stacks = gameStacks b
+
+replaceStack :: Int -> [Stack] -> Stack -> [Stack]
+replaceStack i stacks with = before ++ [with] ++ after
+    where (before, _:after) = splitAt i stacks
 
 -- Render een enkele stapel
 renderStack :: (Card -> Picture) -> Stack -> Picture
-renderStack cardLookup stack = pictures $ transLateCumulative 0 (-pxlVerticalStackInset) cardPictures
+renderStack cardLookup stack = pictures $ translateCumulative 0 (-pxlVertStackInset) cardPictures
     where cardPictures = map cardLookup stack
 
 -- Render de game
@@ -236,15 +230,15 @@ renderGame cardLookup selectorPics Game{board = b, selector = s} = pictures [ren
 
 -- Render de stapels over heel de game
 renderGameStacks :: (Card -> Picture) -> [Stack] -> Picture
-renderGameStacks cardLookup stacks = pictures $ transLateCumulative dx 0 stackPictures
+renderGameStacks cardLookup stacks = pictures $ translateCumulative dx 0 stackPictures
     where stackPictures = map (renderStack cardLookup) stacks
-          dx = pxlImageWidth + pxlHorizontalStackInset
+          dx = pxlImageWidth + pxlHorStackInset
 
 -- Render de ending stapels
 renderEndingstacks :: (Card -> Picture) -> [Stack] -> Picture
-renderEndingstacks cardLookup stacks = pictures $ transLateCumulative dx 0 stackPictures
+renderEndingstacks cardLookup stacks = pictures $ translateCumulative dx 0 stackPictures
     where stackPictures = map (renderPile cardLookup) stacks
-          dx = pxlImageWidth + pxlHorizontalStackInset -- TODO dup weghalen
+          dx = pxlImageWidth + pxlHorStackInset -- TODO dup weghalen
 
 -- Render de afhaalstapel
 renderPile :: (Card -> Picture) -> Stack -> Picture
@@ -256,11 +250,12 @@ step _ game = game
 
 handleInput :: Event -> Game -> Game
 handleInput ev g@Game{board = b, selector = s} 
-  | isKey KeyDown  ev && canSelectorMove s D = move g D
-  | isKey KeyUp    ev && canSelectorMove s U = move g U
-  | isKey KeyLeft  ev && canSelectorMove s L = move g L
-  | isKey KeyRight ev && canSelectorMove s R = move g R
-handleInput _ game = undefined
+  | isKey KeyDown  ev && canSelectorMove g down  = move g down
+  | isKey KeyUp    ev && canSelectorMove g up    = move g up
+  | isKey KeyLeft  ev && canSelectorMove g left  = move g left
+  | isKey KeyRight ev && canSelectorMove g right = move g right
+  | isKey KeySpace ev && canSelectCard g = handleGameSelection g
+handleInput _ game = game
 
 main :: IO ()
 main = do
@@ -271,8 +266,8 @@ main = do
     selectorPic  <- loadJuicyPNG $ assetFolder ++ "/" ++ "selector.png" 
     selectedPic  <- loadJuicyPNG $ assetFolder ++ "/" ++ "selected.png" 
     let cardPictures = map fromJust maybeCardPictures
-    let cardPictureLookupTable = zip allShowCards cardPictures
-    let cardLookup = lookUp cardPictureLookupTable (fromJust back) (fromJust placeholder)
+    let cardPictureLookupTable = (placeholderCard, fromJust placeholder) : zip allShowCards cardPictures
+    let cardLookup = lookUp cardPictureLookupTable (fromJust back)
     play window backgroundColor fps initGame (renderGame cardLookup (fromJust selectorPic, fromJust selectedPic)) handleInput step
 
 
