@@ -65,7 +65,7 @@ showCard (t, v, _) = (t, v, Visible)
 
 -- show last card in a stack
 showLast :: Stack -> Stack
-showLast [] = []
+showLast [] = [placeholderCard]
 showLast stack = init stack ++ [showCard $ last stack]
 
 canMove :: Game -> Coordinate -> Direction -> Bool

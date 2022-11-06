@@ -114,14 +114,32 @@ selectCard g@Game{selector = s@Selector{position = p}} = g{selector = s{selected
 -- Geeft aan of een kaart geselecteerd kan worden of niet.
 -- Dit is het gavel als de kaart omgedraaid is en hij op het speelveld ligt.
 canSelectCard :: Game -> Bool
-canSelectCard g = canSelectPosition ((position . selector) g) g
+canSelectCard g
+  | isNothing selectedPos = canSelect selectorPos g
+  | otherwise             = canSelectPosition selectorPos g
+  where selectorPos = (position . selector) g
+        selectedPos = (selected . selector) g
 
+canSelect :: Coordinate -> Game -> Bool
+canSelect co = isCardVisible . getCardFromCo co
+
+
+-- TODO rename naar een var van moveOnto
 canSelectPosition :: Coordinate -> Game -> Bool
 canSelectPosition (Pile, _, _)         g = (not . null . pile . board) g
 canSelectPosition (EndingStacks, x, _) g = (not . null) ((endingStacks . board) g !! x)
-canSelectPosition (GameField, x, y)    g = isCardVisible card
-    where card = cardStack !! y
-          cardStack = (gameStacks  . board) g !! x
+canSelectPosition (GameField, x, y)    g = canMoveOnto card onto
+    where (card, onto) = getPotentialMovement g
+
+getPotentialMovement :: Game -> (Card, Card)
+getPotentialMovement g = (getCardFromCo (fromJust from) g, getCardFromCo onto g)
+    where from = (selected . selector) g
+          onto = (position . selector) g
+
+getCardFromCo :: Coordinate -> Game -> Card
+getCardFromCo (Pile, _, _)         g = (last . pile . board) g
+getCardFromCo (EndingStacks, x, _) g =  last $ (endingStacks . board) g !! x
+getCardFromCo (GameField, x, y)    g = (gameStacks (board g) !! x) !! y
 
 handleGameSelection :: Game -> Game
 handleGameSelection g = handleSelection maybeSelected selectorPos g
@@ -157,7 +175,7 @@ getCardValue :: Card -> Int
 getCardValue (_, value, _) = fromEnum value
 
 canMoveOnto :: Card -> Card -> Bool
-canMoveOnto c1 c2 = colorsDifferent && oneLower
+canMoveOnto c1 c2 = (c2 == placeholderCard) || (colorsDifferent && oneLower && isCardVisible c2)
     where colorsDifferent = getCardColor c1 /= getCardColor c2
           oneLower = getCardValue c2 == getCardValue c2 - 1
 
