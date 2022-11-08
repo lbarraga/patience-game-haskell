@@ -1,6 +1,7 @@
 module PatienceLogica where
 
 import Types
+import Cards (placeholderCard, showCard)
 
 -- === Constanten == 
 
@@ -11,10 +12,6 @@ allCards = [(cardType, cardValue, Hidden) | cardType <- [Clubs .. Spades], cardV
 -- Aantal ending stacks
 nEndingStacks :: Int
 nEndingStacks = 4
-
--- de placeholder kaart
-placeholderCard :: Card
-placeholderCard = (NoneType, NoneValue, NoneStatus)
 
 -- Het aantal oplopende stapels op het speelveld
 nSpeelVeldStapels :: Int
@@ -62,30 +59,19 @@ makeGameField cards maxPile = previousStacks ++ [showLast stack]
     where stack = take maxPile cards
           previousStacks = makeGameField (drop maxPile cards) (maxPile - 1)
 
-showCard :: Card -> Card
-showCard (t, v, _) = (t, v, Visible)
+
+rotateStackNTimes :: Stack -> Int -> Stack
+rotateStackNTimes [] _     = []
+rotateStackNTimes l 0      = l
+rotateStackNTimes (x:xs) n = rotateStackNTimes (xs ++ [x]) (n - 1)
+
 
 -- show last card in a stack
 showLast :: Stack -> Stack
 showLast [] = [placeholderCard]
 showLast stack = init stack ++ [showCard $ last stack]
 
-canMove :: Game -> Coordinate -> Direction -> Bool
-canMove g (GameField, x, y) dir@(dx, dy)   
-  | dir == up = True                                  -- Je kan altijd naar boven gaan vanaf speelveld (hogere kaart, pile of endingstapels).
-  | otherwise = isInGameField (x + dx, y + dy) g      -- True als de bestemming binnen het speelveld ligt.
-canMove g (EndingStacks, x, _) dir
-  | dir == right = x /= nEndingStacks - 1             -- Kan enkel naar rechts als je je niet op de laatste eindstapel bevind.
-  | otherwise    = dir `elem` [left, down]            -- Vanaf de eindstapels kan je naar links (kaart of pile) en naar onder (gameveld).
-canMove g (Pile, _, _) dir = dir `elem` [right, down] -- Vanuit de pile kan je naar onder (gameveld) of de rechts (eindstapels) gaan.
-
-isInGameField :: (Int, Int) -> Game -> Bool
-isInGameField (x, y) game = x `elem` [0..(nSpeelVeldStapels - 1)] && y `elem` [0..(length (stacks !! x) - 1)]
-    where stacks = (gameStacks . board) game
-
-canSelectorMove :: Game -> Direction -> Bool
-canSelectorMove g@Game{selector = s@Selector{position = p}} = canMove g p
-
+-- Initiele staat van de selector.
 moveSelectorPos :: Coordinate -> Direction -> Coordinate
 moveSelectorPos (GameField, x, 0) (0, -1)  -- UP TODO iets bedenken
   | x >= 2    = (EndingStacks, max (x - 3) 0 , 0)
@@ -98,3 +84,4 @@ moveSelectorPos (EndingStacks, 0, _) dir
 moveSelectorPos (EndingStacks, x, _) dir 
   | dir == down  = (GameField, x + 3, 0)
 moveSelectorPos (region, x, y) (dx, dy) = (region, x + dx, y + dy)
+
