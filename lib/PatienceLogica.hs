@@ -31,7 +31,7 @@ initGameField = makeGameField (take aantalSpeelVeldKaarten allCards) nSpeelVeldS
 
 -- De initiele kaarten op de pile (kaarten die overgehouden zijn na het nemen van de speelVeldKaarten)
 initPile :: Stack
-initPile = showLast $ drop aantalSpeelVeldKaarten allCards
+initPile = map showCard (drop aantalSpeelVeldKaarten allCards)
 
 -- de initiele kaarten op de endingstacks
 initEndingStacks :: [Stack]
@@ -47,7 +47,7 @@ initBoard = Board {
 
 -- Initiele staat van de selector.
 initSelector :: Selector
-initSelector = Selector {position = (Pile, 2, 3), selected = Nothing}
+initSelector = Selector {position = (Pile, 0, 0), selected = Nothing}
 
 -- Initiele opstelling van de game
 initGame :: Game
@@ -58,7 +58,9 @@ initGame = Game {board = initBoard, selector = initSelector}
 -- Maak stapels van oplopende grootte: van 1, 2, ..., tot grootte maxPile
 makeGameField :: [Card] -> Int -> [Stack]
 makeGameField cards 0 = []
-makeGameField cards maxPile = makeGameField (drop maxPile cards) (maxPile - 1) ++ [showLast $ take maxPile cards]
+makeGameField cards maxPile = previousStacks ++ [showLast stack]
+    where stack = take maxPile cards
+          previousStacks = makeGameField (drop maxPile cards) (maxPile - 1)
 
 showCard :: Card -> Card
 showCard (t, v, _) = (t, v, Visible)
@@ -84,15 +86,15 @@ isInGameField (x, y) game = x `elem` [0..(nSpeelVeldStapels - 1)] && y `elem` [0
 canSelectorMove :: Game -> Direction -> Bool
 canSelectorMove g@Game{selector = s@Selector{position = p}} = canMove g p
 
-moveSelectorPos :: Coordinate -> Direction ->  Coordinate
-moveSelectorPos (GameField, x, 0) (0, -1) -- TODO iets bedenken
+moveSelectorPos :: Coordinate -> Direction -> Coordinate
+moveSelectorPos (GameField, x, 0) (0, -1)  -- UP TODO iets bedenken
   | x >= 2    = (EndingStacks, max (x - 3) 0 , 0)
   | otherwise = (Pile, 0, 0)
-moveSelectorPos (Pile, _, _) dir
+moveSelectorPos (Pile, _, _) dir 
   | dir == right = (EndingStacks, 0, 0)
   | dir == down  = (GameField,    0, 0)
-moveSelectorPos (EndingStacks, 0, _) dir
-  | dir == left  = (Pile, 0, 0)
-moveSelectorPos (EndingStacks, x, _) dir
+moveSelectorPos (EndingStacks, 0, _) dir 
+  | dir == left  = (Pile, 0, 0) 
+moveSelectorPos (EndingStacks, x, _) dir 
   | dir == down  = (GameField, x + 3, 0)
 moveSelectorPos (region, x, y) (dx, dy) = (region, x + dx, y + dy)

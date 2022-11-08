@@ -3,9 +3,11 @@ import Types
 import Graphics.Gloss.Interface.IO.Game
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
-import Data.Maybe (fromJust, isNothing)
+import Data.Maybe (fromJust, isNothing, catMaybes, fromMaybe)
 import Control.Exception
 import Control.Concurrent (waitQSem)
+import Data.Bool (Bool)
+import GHC.IO (unsafePerformIO)
 
 -- ===============================================================
 -- Main module: deze module heeft als doel de gegenereerde
@@ -29,7 +31,7 @@ pxlWidth = 800
 
 -- De hoogte van het spel in pixels.
 pxlHeight :: Int
-pxlHeight = 500
+pxlHeight = 700
 
 -- De breedte van een kaart foto
 pxlImageWidth :: Float
@@ -45,11 +47,23 @@ pxlHorStackInset = 5
 
 --Initiele positie van het Gloss venster.
 windowPosition :: (Int, Int)
-windowPosition = (200, 200)
+windowPosition = (200, 80)
 
 -- De plaats waar de fotos opgeslagen zijn.
 assetFolder :: String
 assetFolder = "lib/assets"
+
+backPicture, placeholderPicture, selectorPicture, selectedPicture :: Picture
+backPicture        = png $ assetFolder ++ "/" ++ "back.png"
+placeholderPicture = png $ assetFolder ++ "/" ++ "placeholder.png"
+selectorPicture    = png $ assetFolder ++ "/" ++ "selector.png"
+selectedPicture    = png $ assetFolder ++ "/" ++ "selected.png"
+
+allCardsShown :: [Card]
+allCardsShown = [(cardType, cardValue, Visible) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]]
+
+cardLookupTable :: [(Card, Picture)]
+cardLookupTable = (placeholderCard, placeholderPicture) : zip allCardsShown (map (png . toPath) allCardsShown)
 
 -- Achtergrond kleur van het gloss venster
 backgroundColor :: Color
@@ -61,12 +75,12 @@ window = InWindow "Patience" (pxlWidth, pxlHeight) windowPosition
 
 -- === HulpFuncties ===
 
+png :: String -> Picture
+png = fromJust . unsafePerformIO . loadJuicyPNG
+
 -- Zoek de picture van een kaart op. backpicture wanneer kaart niet gevonden.
-lookUp :: [(Card, Picture)] -> Picture -> Card -> Picture
-lookUp table backPicture findCard 
-  | isNothing picture = backPicture
-  | otherwise         = fromJust picture 
-  where picture = lookup findCard table -- ! lookup zonder hoofdletter uit Prelude !
+cardLookup :: Card -> Picture
+cardLookup findCard = fromMaybe backPicture (lookup findCard cardLookupTable)
 
 -- Zet de zelfgedefinieerde `Coordinate` om in een `GlossCoordinate`
 coordinate2Gloss :: Coordinate -> GlossCoordinate
@@ -111,89 +125,112 @@ selectCard :: Game -> Game
 selectCard g@Game{selector = s@Selector{position = p}} = g{selector = s{selected = Just p}}
 
 -- TODO move
--- Geeft aan of een kaart geselecteerd kan worden of niet.
--- Dit is het gavel als de kaart omgedraaid is en hij op het speelveld ligt.
-canSelectCard :: Game -> Bool
-canSelectCard g
+-- Of de selector geplaatst kan worden. Er zijn twee mogelijkheden:
+-- 1. Er is nog geen kaart geselecteerd -> kan de huidge kaart geselecteerd worden?
+-- 2. Er is al een kaart geselecteerd   -> kan de verplaatsing gebeurden?
+canPlaceSelector :: Game -> Bool
+canPlaceSelector g
   | isNothing selectedPos = canSelect selectorPos g
-  | otherwise             = canSelectPosition selectorPos g
-  where selectorPos = (position . selector) g
-        selectedPos = (selected . selector) g
+  | otherwise             = canPerformMovement region card onto
+  where selectorPos@(region, _, _) = (position . selector) g
+        selectedPos                = (selected . selector) g
+        (card, onto) = getPotentialMovement g
 
+-- Of een kaart geselecteerd kan worden of niet. 
 canSelect :: Coordinate -> Game -> Bool
 canSelect co = isCardVisible . getCardFromCo co
 
+-- c1: de kaart die verplaatst word
+-- c2: de kaart waarop c1 geplaatst wordt.
+-- region: de `Region` van c2 
+-- returns: Of kaart c1 op kaart c2 geplaatst kan worden
+canPerformMovement :: Region -> Card -> Card -> Bool
+canPerformMovement Pile         c1 c2 = False -- Kan niet op de Pile plaatsen. 
+canPerformMovement EndingStacks c1 c2 = (c2 == placeholderCard && isAce  c1) || (getSuit  c1 == getSuit  c2 && c2 `isOneLess` c1)
+canPerformMovement GameField    c1 c2 = (c2 == placeholderCard && isKing c1) || (getColor c1 /= getColor c2 && isCardVisible c2 && c1 `isOneLess` c2)
 
--- TODO rename naar een var van moveOnto
-canSelectPosition :: Coordinate -> Game -> Bool
-canSelectPosition (Pile, _, _)         g = (not . null . pile . board) g
-canSelectPosition (EndingStacks, x, _) g = (not . null) ((endingStacks . board) g !! x)
-canSelectPosition (GameField, x, y)    g = canMoveOnto card onto
-    where (card, onto) = getPotentialMovement g
+-- TODO kaartmodule
+isOneLess :: Card -> Card -> Bool
+isOneLess (_, v1, _) (_, v2, _) = fromEnum v1 == fromEnum v2 - 1
+
+-- TODO kaartModule
+isAce :: Card -> Bool
+isAce (_, v, _) = v == Ace
+
+-- TODO kaartModule
+isKing :: Card -> Bool
+isKing (_, v, _) = v == King
+
+rotateStackNTimes :: Stack -> Int -> Stack
+rotateStackNTimes [] _     = []
+rotateStackNTimes l 0      = l
+rotateStackNTimes (x:xs) n = rotateStackNTimes (xs ++ [x]) (n - 1)
+
+rotatePile :: Game -> Game
+rotatePile g@Game{board = b@Board{pile = p}} = g{ board = b{pile = newPile}}
+    where newPile = rotateStackNTimes p 2
 
 getPotentialMovement :: Game -> (Card, Card)
-getPotentialMovement g = (getCardFromCo (fromJust from) g, getCardFromCo onto g)
+getPotentialMovement g = (getCardFromCo (fromJust from) g, getLastFromCo onto g)
     where from = (selected . selector) g
           onto = (position . selector) g
 
+-- Geef de bovenste kaart van de stapel waar een coordinaat zich bevind.
+getLastFromCo :: Coordinate -> Game -> Card
+getLastFromCo (GameField, x, y) = last . (!! x) . gameStacks . board
+getLastFromCo co = getCardFromCo co
+
+-- Ga van een coordinaat naar een kaart.
 getCardFromCo :: Coordinate -> Game -> Card
-getCardFromCo (Pile, _, _)         g = (last . pile . board) g
-getCardFromCo (EndingStacks, x, _) g =  last $ (endingStacks . board) g !! x
-getCardFromCo (GameField, x, y)    g = (gameStacks (board g) !! x) !! y
+getCardFromCo (Pile,         _, _) = last   . pile   . board
+getCardFromCo (EndingStacks, x, _) = last   . (!! x) . endingStacks . board
+getCardFromCo (GameField,    x, y) = (!! y) . (!! x) . gameStacks   . board
 
 handleGameSelection :: Game -> Game
 handleGameSelection g = handleSelection maybeSelected selectorPos g
       where maybeSelected = (selected . selector) g
             selectorPos   = (position . selector) g
 
--- Selecteerd een kaart indien er nog geen geselecteerd werd, 
--- verplaats anders alle kaarten vanaf selected naar de selector
 handleSelection :: Maybe Coordinate -> Coordinate -> Game -> Game
-handleSelection Nothing selectorPos = selectCard 
+handleSelection Nothing            selectorPos = selectCard 
 handleSelection (Just selectedPos) selectorPos = deselect . moveSubStack selectedPos selectorPos
 
 deselect :: Game -> Game
 deselect g@Game{selector = s} = g{selector = s{selected = Nothing}}
 
--- TODO move
--- Neem de kaart en alle bovenliggende op een bepaalde positie en plaats ze op een andere positie
--- Mogelijke verplaatsingen zijn
---  * GameField    -> GameField | EndingStacks
---  * Pile         -> GameField | EndingStacks
---  * EndingStacks -> GameField
-canMoveRegion :: Region -> Region -> Bool
-canMoveRegion EndingStacks EndingStacks = False -- Kan in principe maar waarom zou je.
-canMoveRegion _ Pile = False -- Je kan geen kaarten op de Pile leggen.
-canMoveRegion _ _ = True
+-- TODO move kaartModule
+getColor :: Card -> CardColor
+getColor (Hearts  , _, _) = Red
+getColor (Diamonds, _, _) = Red
+getColor _ = Black
 
-getCardColor :: Card -> CardColor
-getCardColor (Hearts  , _, _) = Red
-getCardColor (Diamonds, _, _) = Red
-getCardColor _ = Black
+-- TODO move kaartModule
+getSuit :: Card -> CardType
+getSuit (v, _, _) = v
 
-getCardValue :: Card -> Int
-getCardValue (_, value, _) = fromEnum value
+-- TODO move kaartModule
+getValue :: Card -> Int
+getValue (_, value, _) = fromEnum value
 
-canMoveOnto :: Card -> Card -> Bool
-canMoveOnto c1 c2 = (c2 == placeholderCard) || (colorsDifferent && oneLower && isCardVisible c2)
-    where colorsDifferent = getCardColor c1 /= getCardColor c2
-          oneLower = getCardValue c2 == getCardValue c2 - 1
-
+-- TODO move naar board Module top level
 moveSubStack :: Coordinate -> Coordinate -> Game -> Game
 moveSubStack from to g@Game{board = b} = g{board = newBoard}
     where newBoard = boardAfterPlacingStack to removed removedBoard
           (removed, removedBoard) = takeStackAction from b 
 
+-- TODO board
 -- Verwijder een substapel kaarten van het bord,
 -- geeft de substapel terug en het bord na de verwijder actie
 takeStackAction :: Coordinate -> Board -> (Stack, Board)
 takeStackAction co b = (takeStack co b, boardAfterRemove co b)
 
+-- TODO board
 takeStack :: Coordinate -> Board -> Stack
 takeStack (Pile, _, _)         b = [last $ pile b]
 takeStack (EndingStacks, x, _) b = [last $ endingStacks b !! x]
 takeStack (GameField, x, y)    b = drop y (gameStacks b !! x)
 
+-- TODO board
 boardAfterRemove :: Coordinate -> Board -> Board
 boardAfterRemove (Pile, _, _)         b = b{pile = (showLast . init) $ pile b}
 boardAfterRemove (EndingStacks, x, _) b = b{endingStacks = replaceStack x stacks newEndingStack}
@@ -203,64 +240,78 @@ boardAfterRemove (GameField, x, y)    b = b{gameStacks = replaceStack x stacks n
     where newGameStack = (showLast . take y) (stacks !! x) -- alle kaarten vanaf co y zijn weg 
           stacks = gameStacks b
 
-boardAfterPlacingStack :: Coordinate ->  Stack -> Board -> Board
-boardAfterPlacingStack (EndingStacks, x, _) s b = b{endingStacks = replaceStack x stacks newEndingStack }
-    where newEndingStack = stacks !! x ++ s
-          stacks = endingStacks b
-boardAfterPlacingStack (GameField, x, _) s b = b{gameStacks = replaceStack x stacks newGameStack}
-    where newGameStack = stacks !! x ++ s
-          stacks = gameStacks b
+-- TODO board
+checkPlaceholder :: Stack -> Stack
+checkPlaceholder (x:xs)
+  | x == placeholderCard = xs
+  | otherwise            = x:xs
 
+-- TODO board
+placeOnStack :: [Stack] -> Int -> Stack -> [Stack]
+placeOnStack stacks replaceIndex stack = replaceStack replaceIndex stacks newEndingStack
+    where newEndingStack = checkPlaceholder (stacks !! replaceIndex ++ stack)
+
+-- TODO board
+boardAfterPlacingStack :: Coordinate ->  Stack -> Board -> Board
+boardAfterPlacingStack (EndingStacks, x, _) s b = b{endingStacks = placeOnStack (endingStacks b) x s}
+boardAfterPlacingStack (GameField, x, _)    s b = b{gameStacks   = placeOnStack (gameStacks   b) x s}
+
+-- TODO board
 replaceStack :: Int -> [Stack] -> Stack -> [Stack]
 replaceStack i stacks with = before ++ [with] ++ after
     where (before, _:after) = splitAt i stacks
 
--- Render een enkele stapel
-renderStack :: (Card -> Picture) -> Stack -> Picture
-renderStack cardLookup stack = pictures $ translateCumulative 0 (-pxlVertStackInset) cardPictures
-    where cardPictures = map cardLookup stack
+-- ===============================================================================
+-- ||                              RENDERFUNCTIES                               ||
+-- ===============================================================================
 
 -- Render de game
-renderBoard :: (Card -> Picture) -> Board -> Picture
-renderBoard cardLookup Board{ gameStacks = gs, pile = p, endingStacks = es } = pictures [speelVeld, endingStacks, pile]
-    where speelVeld    = translate (-300) 0   (renderGameStacks cardLookup gs) -- TODO constanten weg
-          endingStacks = translate 15     150 (renderEndingstacks cardLookup es) -- TODO -85 = -400 + 3*100 + 3*hInsets
-          pile         = translate (-300) 150 (renderPile cardLookup p)
+renderBoard :: Board -> Picture
+renderBoard Board{ gameStacks = gs, pile = p, endingStacks = es } = pictures [speelVeld, endingStacks, pile]
+    where speelVeld    = translate (-300) 0   (renderGameStacks gs)   -- TODO constanten weg
+          endingStacks = translate 15     150 (renderEndingstacks es) -- TODO -85 = -400 + 3*100 + 3*hInsets
+          pile         = translate (-300) 150 (renderPile p)
 
 -- Render de selector
-renderSelector :: (Picture, Picture) -> Selector -> Picture
-renderSelector (selectorPic, selectedPic) Selector{position = pos, selected = maybePos} = pictures [renderSelectorPosition selectorPic pos, renderSelected selectedPic maybePos]
+renderSelector :: Selector -> Picture
+renderSelector Selector{position = pos, selected = maybePos} = pictures [renderSelectorPos pos, renderSelectedPos maybePos]
 
 -- Render de positie van de selector
-renderSelectorPosition :: Picture -> Coordinate -> Picture
-renderSelectorPosition selectorPic pos = Translate x y selectorPic
+renderSelectorPos :: Coordinate -> Picture
+renderSelectorPos pos = Translate x y selectorPicture
     where (x, y) = coordinate2Gloss pos
 
 -- Render de selected van de selector
-renderSelected :: Picture -> Maybe Coordinate -> Picture
-renderSelected _ Nothing = blank
-renderSelected selectedPic (Just pos) = Translate x y selectedPic
+renderSelectedPos :: Maybe Coordinate -> Picture
+renderSelectedPos Nothing    = blank
+renderSelectedPos (Just pos) = Translate x y selectedPicture
     where (x, y) = coordinate2Gloss pos
 
 -- Render het bord
-renderGame :: (Card -> Picture) -> (Picture, Picture) -> Game -> Picture
-renderGame cardLookup selectorPics Game{board = b, selector = s} = pictures [renderBoard cardLookup b, renderSelector selectorPics s]
+renderGame :: Game -> Picture
+renderGame Game{board = b, selector = s} = pictures [renderBoard b, renderSelector s]
 
 -- Render de stapels over heel de game
-renderGameStacks :: (Card -> Picture) -> [Stack] -> Picture
-renderGameStacks cardLookup stacks = pictures $ translateCumulative dx 0 stackPictures
-    where stackPictures = map (renderStack cardLookup) stacks
-          dx = pxlImageWidth + pxlHorStackInset
+renderGameStacks :: [Stack] -> Picture
+renderGameStacks stacks = renderYeet stacks renderStack (pxlImageWidth + pxlHorStackInset) 0
+
+-- Render een enkele stapel
+renderStack :: Stack -> Picture
+renderStack stack = renderYeet stack cardLookup 0 (-pxlVertStackInset)
+
+renderYeet :: [a] -> (a -> Picture) -> Float -> Float -> Picture
+renderYeet l f dx dy = pictures $ translateCumulative dx dy pics
+    where pics = map f l
 
 -- Render de ending stapels
-renderEndingstacks :: (Card -> Picture) -> [Stack] -> Picture
-renderEndingstacks cardLookup stacks = pictures $ translateCumulative dx 0 stackPictures
-    where stackPictures = map (renderPile cardLookup) stacks
+renderEndingstacks :: [Stack] -> Picture
+renderEndingstacks stacks = pictures $ translateCumulative dx 0 stackPictures
+    where stackPictures = map renderPile stacks -- Alle pictures in de map
           dx = pxlImageWidth + pxlHorStackInset -- TODO dup weghalen
 
 -- Render de afhaalstapel
-renderPile :: (Card -> Picture) -> Stack -> Picture
-renderPile cardLookup stack = cardLookup $ last stack
+renderPile :: Stack -> Picture
+renderPile = cardLookup . last
 
 -- stap in de game
 step :: Float -> Game -> Game
@@ -268,25 +319,17 @@ step _ game = game
 
 handleInput :: Event -> Game -> Game
 handleInput ev g@Game{board = b, selector = s} 
-  | isKey KeyDown  ev && canSelectorMove g down  = move g down
-  | isKey KeyUp    ev && canSelectorMove g up    = move g up
-  | isKey KeyLeft  ev && canSelectorMove g left  = move g left
-  | isKey KeyRight ev && canSelectorMove g right = move g right
-  | isKey KeySpace ev && canSelectCard g = handleGameSelection g
+  | isKey KeyDown  ev && canSelectorMove g down   = move g down
+  | isKey KeyUp    ev && canSelectorMove g up     = move g up
+  | isKey KeyLeft  ev && canSelectorMove g left   = move g left
+  | isKey KeyRight ev && canSelectorMove g right  = move g right
+  | isKey KeySpace ev && not (canPlaceSelector g) = deselect g
+  | isKey KeySpace ev && canPlaceSelector g       = handleGameSelection g
+  | isKey KeyEnter ev = rotatePile g
 handleInput _ game = game
 
 main :: IO ()
-main = do
-    let allShowCards = placeholderCard : [(cardType, cardValue, Visible) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]] -- TODO weg
-    maybeCardPictures <- mapM (loadJuicyPNG . toPath) allShowCards
-    back         <- loadJuicyPNG $ assetFolder ++ "/" ++ "back.png"
-    placeholder  <- loadJuicyPNG $ assetFolder ++ "/" ++ "placeholder.png"
-    selectorPic  <- loadJuicyPNG $ assetFolder ++ "/" ++ "selector.png" 
-    selectedPic  <- loadJuicyPNG $ assetFolder ++ "/" ++ "selected.png" 
-    let cardPictures = map fromJust maybeCardPictures
-    let cardPictureLookupTable = (placeholderCard, fromJust placeholder) : zip allShowCards cardPictures
-    let cardLookup = lookUp cardPictureLookupTable (fromJust back)
-    play window backgroundColor fps initGame (renderGame cardLookup (fromJust selectorPic, fromJust selectedPic)) handleInput step
+main = play window backgroundColor fps initGame renderGame handleInput step
 
 
 
