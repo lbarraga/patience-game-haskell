@@ -67,6 +67,16 @@ data CardStatus = Hidden
                 | NoneStatus
                 deriving (Show, Eq)
 
+
+-- De richting waarin de selector kan bewegen.
+data Direction = U | L | D | R deriving(Show, Eq)
+
+dirToDelta :: Direction -> (Int, Int)
+dirToDelta U = ( 0, -1)
+dirToDelta D = ( 0,  1)
+dirToDelta L = (-1,  0)
+dirToDelta R = ( 1,  0)
+
 -- Een kaart heeft een type, een waarde en een status.
 type Card = (CardType, CardValue, CardStatus)
 
@@ -85,14 +95,6 @@ data Board = Board {
   pile :: Stack
 } deriving (Show)
 
--- De richting waarin de selector kan bewegen.
-type Direction = (Int, Int)
-
-left, right, up, down :: (Int, Int)
-left  = (-1,  0)
-right = ( 1,  0)
-up    = ( 0, -1)
-down  = ( 0,  1)
 
 -- De selector van het spel.
 data Selector = Selector {

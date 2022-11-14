@@ -1,6 +1,7 @@
 import PatienceLogica (initGame)
 import Cards (placeholderCard, allCardsShown, isVisible, canPerformMovement)
-import GameLogica (move, canPlaceSelector, handleGameSelection, deselect, rotatePile, canSelectorMove)
+import GameLogica (move, canGamePlaceSelector, handleGameSelection, rotatePile, canGameSelectorMove)
+import SelectorLogica (deselectCard)
 import Types
 
 import Graphics.Gloss.Interface.IO.Game
@@ -8,8 +9,6 @@ import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import Data.Maybe (fromJust, isNothing, catMaybes, fromMaybe)
 import GHC.IO (unsafePerformIO)
-import Types (Coordinate, Region (EndingStacks))
-import Data.Tuple (uncurry)
 
 -- ===============================================================
 -- Main module: deze module heeft als doel de gegenereerde
@@ -185,12 +184,12 @@ step _ game = game
 
 handleInput :: Event -> Game -> Game
 handleInput ev g@Game{board = b, selector = s} 
-  | isKey KeyDown  ev && canSelectorMove g down   = move g down
-  | isKey KeyUp    ev && canSelectorMove g up     = move g up
-  | isKey KeyLeft  ev && canSelectorMove g left   = move g left
-  | isKey KeyRight ev && canSelectorMove g right  = move g right
-  | isKey KeySpace ev && not (canPlaceSelector g) = deselect g
-  | isKey KeySpace ev && canPlaceSelector g       = handleGameSelection g
+  | isKey KeyDown  ev && canGameSelectorMove g D = move g D
+  | isKey KeyUp    ev && canGameSelectorMove g U = move g U
+  | isKey KeyLeft  ev && canGameSelectorMove g L = move g L
+  | isKey KeyRight ev && canGameSelectorMove g R = move g R
+  | isKey KeySpace ev && not (canGamePlaceSelector g) = deselectCard g
+  | isKey KeySpace ev && canGamePlaceSelector g       = handleGameSelection g
   | isKey KeyEnter ev = rotatePile g
 handleInput _ game = game
 
