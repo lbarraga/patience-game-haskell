@@ -79,12 +79,14 @@ canMove g (GameField, x, y) dir@(dx, dy)
   | otherwise = isInGameField (x + dx, y + dy) g      -- True als de bestemming binnen het speelveld ligt.
 canMove g (EndingStacks, x, _) dir
   | dir == right = x /= nEndingStacks - 1             -- Kan enkel naar rechts als je je niet op de laatste eindstapel bevind.
-  | otherwise    = dir `elem` [left, down]            -- Vanaf de eindstapels kan je naar links (kaart of pile) en naar onder (gameveld).
+  | otherwise    = dir /= up                          -- Vanaf de eindstapels kan je naar links (kaart of pile) en naar onder (gameveld).
 canMove g (Pile, _, _) dir = dir `elem` [right, down] -- Vanuit de pile kan je naar onder (gameveld) of de rechts (eindstapels) gaan.
 
 isInGameField :: (Int, Int) -> Game -> Bool
-isInGameField (x, y) game = x `elem` [0..(nSpeelVeldStapels - 1)] && y `elem` [0..(length (stacks !! x) - 1)]
-    where stacks = (gameStacks . board) game
+isInGameField (x, y) game = containsHor && containsVer
+    where containsHor = x >= 0 && x < nSpeelVeldStapels
+          containsVer = y >= 0 && y < length (stacks !! x)
+          stacks = (gameStacks  . board) game
 
 canSelectorMove :: Game -> Direction -> Bool
 canSelectorMove g@Game{selector = s@Selector{position = p}} = canMove g p

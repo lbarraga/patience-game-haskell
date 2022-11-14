@@ -8,6 +8,8 @@ import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import Data.Maybe (fromJust, isNothing, catMaybes, fromMaybe)
 import GHC.IO (unsafePerformIO)
+import Types (Coordinate, Region (EndingStacks))
+import Data.Tuple (uncurry)
 
 -- ===============================================================
 -- Main module: deze module heeft als doel de gegenereerde
@@ -25,37 +27,40 @@ type GlossCoordinate = (Float, Float)
 fps :: Int
 fps = 60
 
--- De breedte van het spel in pixels.
-pxlWidth :: Int
+-- pxlWidth:  De breedte van het spel in pixels.
+-- pxlHeight: De hoogte van het spel in pixels.
+pxlWidth, pxlHeight :: Int
 pxlWidth = 800
-
--- De hoogte van het spel in pixels.
-pxlHeight :: Int
 pxlHeight = 700
 
 -- De breedte van een kaart foto
 pxlImageWidth :: Float
 pxlImageWidth = 100
 
--- aantal pixels een kaart naar onder geschoven wordt na zijn voorganger op de stapel
-pxlVertStackInset :: Float
+-- pxlVertStackInset: aantal pixels een kaart naar onder geschoven wordt na zijn voorganger op de stapel
+-- pxlHorStackInset:  aantal pixels tussen de stapels op het speelveld
+pxlVertStackInset, pxlHorStackInset :: Float
 pxlVertStackInset = 25
-
--- aantal pixels tussen de stapels op het speelveld
-pxlHorStackInset :: Float
 pxlHorStackInset = 5
+
+pxlFullHorInset :: Float
+pxlFullHorInset = pxlImageWidth + pxlHorStackInset
 
 cardsBetweenPileAndEndingStacks :: Float
 cardsBetweenPileAndEndingStacks = 2
 
-xOffset :: Float
+xOffset, yOffset :: Float
 xOffset = -300
+yOffset = 0
 
-endingStacksOffset :: Float
-endingStacksOffset = xOffset + (pxlImageWidth + pxlHorStackInset) * (cardsBetweenPileAndEndingStacks + 1)
+endingStacksXOffset :: Float
+endingStacksXOffset = xOffset + (pxlImageWidth + pxlHorStackInset) * (cardsBetweenPileAndEndingStacks + 1)
 
 spaceBetweenGameAndUpperField :: Float
 spaceBetweenGameAndUpperField = 150
+
+upperFieldYOffset :: Float
+upperFieldYOffset = yOffset + spaceBetweenGameAndUpperField
 
 --Initiele positie van het Gloss venster.
 windowPosition :: (Int, Int)
@@ -96,9 +101,12 @@ cardLookup findCard = fromMaybe backPicture (lookup findCard cardLookupTable)
 
 -- Zet de zelfgedefinieerde `Coordinate` om in een `GlossCoordinate`
 coordinate2Gloss :: Coordinate -> GlossCoordinate
-coordinate2Gloss (GameField, x, y)    = (xOffset + (pxlImageWidth + pxlHorStackInset) * fromIntegral x, -pxlVertStackInset * fromIntegral y)
-coordinate2Gloss (EndingStacks, x, _) = (endingStacksOffset + (pxlImageWidth + pxlHorStackInset) * fromIntegral x, 150)
-coordinate2Gloss (Pile, _, _)         = (xOffset, 150)
+coordinate2Gloss (EndingStacks, x, _) = (endingStacksXOffset + pxlFullHorInset * fromIntegral x, upperFieldYOffset)
+coordinate2Gloss (GameField, x, y)    = (xOffset             + pxlFullHorInset * fromIntegral x, yOffset + (-pxlVertStackInset) * fromIntegral y)
+coordinate2Gloss (Pile, _, _)         = (xOffset, upperFieldYOffset)
+
+translateToGloss :: Coordinate -> Picture -> Picture
+translateToGloss = uncurry translate . coordinate2Gloss
 
 -- Krijgt een kaart en geeft het pad van de foto van die kaart terug.
 toPath :: Card -> String
@@ -128,9 +136,9 @@ isKey _  _                                   = False
 -- Render de game
 renderBoard :: Board -> Picture
 renderBoard Board{ gameStacks = gs, pile = p, endingStacks = es } = pictures [speelVeld, endingStacks, pile]
-    where speelVeld    = translate (-300) 0   (renderGameStacks gs)   -- TODO constanten weg
-          endingStacks = translate 15     150 (renderEndingstacks es) -- TODO -85 = -400 + 3*100 + 3*hInsets
-          pile         = translate (-300) 150 (renderPile p)
+    where speelVeld    = translate xOffset             yOffset           (renderGameStacks   gs)
+          pile         = translate xOffset             upperFieldYOffset (renderPile         p )
+          endingStacks = translate endingStacksXOffset upperFieldYOffset (renderEndingstacks es)
 
 -- Render de selector
 renderSelector :: Selector -> Picture
@@ -138,14 +146,12 @@ renderSelector Selector{position = pos, selected = maybePos} = pictures [renderS
 
 -- Render de positie van de selector
 renderSelectorPos :: Coordinate -> Picture
-renderSelectorPos pos = Translate x y selectorPicture
-    where (x, y) = coordinate2Gloss pos
+renderSelectorPos pos = translateToGloss pos selectorPicture
 
 -- Render de selected van de selector
 renderSelectedPos :: Maybe Coordinate -> Picture
 renderSelectedPos Nothing    = blank
-renderSelectedPos (Just pos) = Translate x y selectedPicture
-    where (x, y) = coordinate2Gloss pos
+renderSelectedPos (Just pos) = translateToGloss pos selectedPicture
 
 -- Render het bord
 renderGame :: Game -> Picture
@@ -153,7 +159,7 @@ renderGame Game{board = b, selector = s} = pictures [renderBoard b, renderSelect
 
 -- Render de stapels over heel de game
 renderGameStacks :: [Stack] -> Picture
-renderGameStacks = mapBeforeTranslate renderStack (pxlImageWidth + pxlHorStackInset) 0
+renderGameStacks = mapBeforeTranslate renderStack pxlFullHorInset 0
 
 -- Render een enkele stapel
 renderStack :: Stack -> Picture
@@ -161,7 +167,7 @@ renderStack = mapBeforeTranslate cardLookup 0 (-pxlVertStackInset)
 
 -- Render de ending stapels
 renderEndingstacks :: [Stack] -> Picture
-renderEndingstacks = mapBeforeTranslate renderPile (pxlImageWidth + pxlHorStackInset) 0
+renderEndingstacks = mapBeforeTranslate renderPile pxlFullHorInset 0
 
 -- toPicture: een functie die een bepaald waarde omzet naar een picture
 -- dx, dy: de 
