@@ -1,7 +1,6 @@
 import PatienceLogica (initGame)
 import Cards (placeholderCard, allCardsShown, isVisible, canPerformMovement)
-import GameLogica (move, canGamePlaceSelector, handleGameSelection, rotatePile, canGameSelectorMove)
-import SelectorLogica (deselectCard)
+import GameLogica (move, canGamePlaceSelector, handleGameSelection, rotatePile, canGameSelectorMove, gameDeselect)
 import Types
 
 import Graphics.Gloss.Interface.IO.Game
@@ -188,7 +187,7 @@ handleInput ev g@Game{board = b, selector = s}
   | isKey KeyUp    ev && canGameSelectorMove g U = move g U
   | isKey KeyLeft  ev && canGameSelectorMove g L = move g L
   | isKey KeyRight ev && canGameSelectorMove g R = move g R
-  | isKey KeySpace ev && not (canGamePlaceSelector g) = deselectCard g
+  | isKey KeySpace ev && not (canGamePlaceSelector g) = gameDeselect g
   | isKey KeySpace ev && canGamePlaceSelector g       = handleGameSelection g
   | isKey KeyEnter ev = rotatePile g
 handleInput _ game = game

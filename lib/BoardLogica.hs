@@ -4,6 +4,25 @@ import Types
 import PatienceLogica
 import Cards (placeholderCard)
 
+import Data.Maybe (fromJust)
+
+-- Of er vanaf een bepaalde coordinaat in een bepaalde richting gegaan kan worden. 
+canMoveInDirection :: Coordinate -> Board -> Direction -> Bool
+canMoveInDirection (EndingStacks, x, _) _ R  = x /= nEndingStacks - 1            -- Kan enkel naar rechts als je je niet op de laatste eindstapel bevind.
+canMoveInDirection (EndingStacks, _, _) _ d  = d /= U                            -- Vanaf de eindstapels kan je naar links (kaart of pile) en naar onder (gameveld).
+canMoveInDirection (Pile        , _, _) _ d  = d == D || d == R                  -- Vanuit de pile kan je naar onder (gameveld) of de rechts (eindstapels) gaan.
+canMoveInDirection (GameField   , x, y) _ U  = True                              -- Je kan altijd naar boven gaan vanaf speelveld (hogere kaart, pile of endingstapels).
+canMoveInDirection (GameField   , x, y) b d  = isInGameField (x + dx, y + dy) gs -- True als de bestemming binnen het speelveld ligt.
+    where (dx, dy) = dirToDelta d
+          gs = gameStacks b
+
+-- Of een bepaalde coordinaat zich in het gameVeld bevind (Dit gaat dus niet over de pile of endingstacks)
+isInGameField :: (Int, Int) -> [Stack] -> Bool
+isInGameField (x, y) gameField = containsHor && containsVer
+    where containsHor = x >= 0 && x < nSpeelVeldStapels
+          containsVer = y >= 0 && y < length stack
+          stack = gameField !! x
+
 moveSubStack :: Coordinate -> Coordinate -> Game -> Game
 moveSubStack from to g@Game{board = b} = g{board = newBoard}
     where newBoard = boardAfterPlacingStack to removed removedBoard
@@ -51,3 +70,15 @@ boardAfterPlacingStack (GameField, x, _)    s b = b{gameStacks   = placeOnStack 
 replaceStack :: Int -> [Stack] -> Stack -> [Stack]
 replaceStack i stacks with = before ++ [with] ++ after
     where (before, _:after) = splitAt i stacks
+          
+-- Geef de kaart gelegen op een bepaalde coordinaat
+getCardFromCo :: Coordinate -> Board -> Card
+getCardFromCo (Pile,         _, _) = last   . pile
+getCardFromCo (EndingStacks, x, _) = last   . (!! x) . endingStacks
+getCardFromCo (GameField,    x, y) = (!! y) . (!! x) . gameStacks
+
+-- Geef de bovenste kaart van de stapel waar een coordinaat zich bevind.
+getLastFromCo :: Coordinate -> Board -> Card
+getLastFromCo (GameField, x, _) = last . (!! x) . gameStacks
+getLastFromCo co = getCardFromCo co
+
