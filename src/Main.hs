@@ -40,24 +40,28 @@ pxlVertStackInset, pxlHorStackInset :: Float
 pxlVertStackInset = 25
 pxlHorStackInset = 5
 
+-- breedte kaart + ruimte tussen twee kaartkolommen (komt vaak voor dus staat appart)
 pxlFullHorInset :: Float
 pxlFullHorInset = pxlImageWidth + pxlHorStackInset
 
+-- het aantal lege kaartplaatsen tussen de pile en de endingStacks
 cardsBetweenPileAndEndingStacks :: Float
 cardsBetweenPileAndEndingStacks = 2
 
+-- Offset van de volledige game
 xOffset, yOffset :: Float
 xOffset = -300
 yOffset = 0
 
+-- xoffset van de endingstacks 
 endingStacksXOffset :: Float
 endingStacksXOffset = xOffset + (pxlImageWidth + pxlHorStackInset) * (cardsBetweenPileAndEndingStacks + 1)
 
-spaceBetweenGameAndUpperField :: Float
-spaceBetweenGameAndUpperField = 150
-
 upperFieldYOffset :: Float
 upperFieldYOffset = yOffset + spaceBetweenGameAndUpperField
+
+spaceBetweenGameAndUpperField :: Float
+spaceBetweenGameAndUpperField = 150
 
 --Initiele positie van het Gloss venster.
 windowPosition :: (Int, Int)
@@ -74,6 +78,7 @@ placeholderPicture = png $ assetFolder ++ "/" ++ "placeholder.png"
 selectorPicture    = png $ assetFolder ++ "/" ++ "selector.png"
 selectedPicture    = png $ assetFolder ++ "/" ++ "selected.png"
 
+-- lookup table van kaart naar zijn bijhorende picture
 cardLookupTable :: [(Card, Picture)]
 cardLookupTable = (placeholderCard, placeholderPicture) : zip allCardsShown (map (png . toPath) allCardsShown)
 
@@ -89,6 +94,7 @@ window = InWindow "Patience" (pxlWidth, pxlHeight) windowPosition
 -- ||                      HulpFuncties                       ||
 -- =============================================================
 
+-- Ga van een filename naar de picture van die file
 png :: String -> Picture
 png = fromJust . unsafePerformIO . loadJuicyPNG
 
@@ -102,6 +108,8 @@ coordinate2Gloss (EndingStacks, x, _) = (endingStacksXOffset + pxlFullHorInset *
 coordinate2Gloss (GameField, x, y)    = (xOffset             + pxlFullHorInset * fromIntegral x, yOffset + (-pxlVertStackInset) * fromIntegral y)
 coordinate2Gloss (Pile, _, _)         = (xOffset, upperFieldYOffset)
 
+-- neemt zelfgedefinieerde `Coordinate`, zet deze om naar een gloss coordinaat
+-- en translate dan een picture naar deze nieuwe coordinaat
 translateToGloss :: Coordinate -> Picture -> Picture
 translateToGloss = uncurry translate . coordinate2Gloss
 
@@ -167,7 +175,9 @@ renderEndingstacks :: [Stack] -> Picture
 renderEndingstacks = mapBeforeTranslate renderPile pxlFullHorInset 0
 
 -- toPicture: een functie die een bepaald waarde omzet naar een picture
--- dx, dy: de 
+-- dx, dy: de offset die telkens cumulatief wordt toegepast op elke 
+-- picture die uit de toPicture mapping komt
+--
 mapBeforeTranslate :: (a -> Picture) -> Float -> Float -> [a] -> Picture
 mapBeforeTranslate toPicture dx dy = pictures . translateCumulative dx dy . map toPicture
 
@@ -193,23 +203,3 @@ handleInput _ game = game
 
 main :: IO ()
 main = play window backgroundColor fps initGame renderGame handleInput step
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

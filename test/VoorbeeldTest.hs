@@ -1,7 +1,7 @@
 import Test.Hspec
 
 import Cards (allCardsShown, isVisible, placeholderCard)
-import PatienceLogica (initPile, aantalSpeelVeldKaarten, initGameField, initEndingStacks)
+import BoardLogica (aantalSpeelVeldKaarten, initPile, initGameField, initEndingStacks)
 
 main :: IO ()
 main = hspec $ do 

@@ -9,6 +9,7 @@ import System.Random
 -- ||                  Constanten                 ||
 -- =================================================
 
+-- Random seed
 seed :: Int
 seed = 1
 
@@ -16,9 +17,11 @@ seed = 1
 allCardsHidden :: [Card]
 allCardsHidden = [(cardType, cardValue, Hidden) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]]
 
+-- | Alle kaarten zichtbaar (nodig voor render)
 allCardsShown :: [Card]
 allCardsShown = map showCard allCardsHidden
 
+-- | alle kaarten door elkaar
 allShuffledCards :: [Card]
 allShuffledCards = shuffleList allCardsHidden
 
@@ -30,6 +33,7 @@ placeholderCard = (NoneType, NoneValue, NoneStatus)
 -- ||                 Hulp Functies              ||
 -- ================================================
 
+-- | Shuffle een lijst.
 shuffleList :: [a] -> [a]
 shuffleList l = shuffle' l (length l) (mkStdGen seed)
 
@@ -41,6 +45,15 @@ canPerformMovement :: Region -> Card -> Card -> Bool
 canPerformMovement Pile         c1 c2 = False -- Kan niet op de Pile plaatsen. 
 canPerformMovement EndingStacks c1 c2 = (c2 == placeholderCard && isAce  c1) || (getSuit  c1 == getSuit  c2 && c2 `isOneLess` c1)
 canPerformMovement GameField    c1 c2 = (c2 == placeholderCard && isKing c1) || (getColor c1 /= getColor c2 && c1 `isOneLess` c2 && isVisible c2)
+
+-- ====================================
+-- Triviale getters en kleine functies:
+--
+-- Ik zou pattern match kunnen gebruikt
+-- hebben in bovenstaande functie maar
+-- ik vind het zo wat leesbaarder.
+-- ===================================
+
 
 isOneLess :: Card -> Card -> Bool
 isOneLess (_, v1, _) (_, v2, _) = fromEnum v1 == fromEnum v2 - 1

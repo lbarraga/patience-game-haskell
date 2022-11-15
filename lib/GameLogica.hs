@@ -51,6 +51,15 @@ gameDeselect g@Game{selector = s} = g{selector = deselect s}
 moveGameSubstack :: Coordinate -> Coordinate -> Game -> Game
 moveGameSubstack selectedPos selectorPos g@Game{board = b} = g{board = moveSubStack selectedPos selectorPos b}
 
+-- tussenfunctie voor properheid
+getPotentialMovementGame :: Game -> (Card, Card) 
+getPotentialMovementGame g = getPotentialMovement (fromJust selectedCo) selectorCo (board g)
+      where (selectedCo, selectorCo) = (getBothSelections . selector) g
+
+-- tussenfunctie voor properheid
+move :: Game -> Direction -> Game
+move g@Game{selector = s} dir = g{selector = moveSelector s dir}
+
 -- =================================================================
 -- ||                     Volledige gamefuncties                  ||
 -- =================================================================
@@ -75,41 +84,22 @@ placeSelector :: Maybe Coordinate -> Coordinate -> Game -> Game
 placeSelector Nothing            selectorPos = gameSelect
 placeSelector (Just selectedPos) selectorPos = gameDeselect . moveGameSubstack selectedPos selectorPos
 
-getPotentialMovementGame :: Game -> (Card, Card) 
-getPotentialMovementGame g = getPotentialMovement (fromJust selectedCo) selectorCo (board g)
-      where (selectedCo, selectorCo) = (getBothSelections . selector) g
-
+-- Geef de kaart momenteel onder de selector
 getSelectedCard :: Game -> Card
 getSelectedCard g = getCardFromCo co (board g)
       where co = (position . selector) g
-
--- move de selector van de game
-move :: Game -> Direction -> Game
-move g@Game{selector = s} dir = g{selector = moveSelector s dir}
 
 -- Move de selector 
 moveSelector :: Selector -> Direction -> Selector
 moveSelector s@Selector{position = p} dir = s{position = moveInDirection p dir}
 
-
+-- Roteer de pile met 3
 rotatePile :: Game -> Game
 rotatePile g@Game{board = b@Board{pile = p}} = g{ board = b{pile = newPile}}
     where newPile = rotateStackNTimes p 2
 
+-- roteer een lijst van kaarten
 rotateStackNTimes :: Stack -> Int -> Stack
 rotateStackNTimes [] _     = []
 rotateStackNTimes l 0      = l
 rotateStackNTimes (x:xs) n = rotateStackNTimes (xs ++ [x]) (n - 1)
-
-
-
-
-
-
-
-
-
-
-
-
-

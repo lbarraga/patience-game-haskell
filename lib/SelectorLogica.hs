@@ -25,6 +25,7 @@ initSelector = Selector {position = initSelectorPos, selected = initSelected}
 -- ================================================
 -- ||                Functies                    ||
 -- ================================================
+
 -- Selecteer de kaart onder de selector
 select :: Selector -> Selector
 select s@Selector{position = selectorPosition} = s{selected = Just selectorPosition}
