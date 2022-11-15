@@ -16,6 +16,26 @@ canMoveInDirection (GameField   , x, y) b d  = isInGameField (x + dx, y + dy) gs
     where (dx, dy) = dirToDelta d
           gs = gameStacks b
 
+moveInDirection :: Coordinate -> Direction -> Coordinate
+moveInDirection (Pile        , _, _) R  = (EndingStacks, 0, 0)
+moveInDirection (Pile        , _, _) D  = (GameField   , 0, 0)
+moveInDirection (EndingStacks, 0, _) L  = (Pile        , 0, 0)
+moveInDirection (EndingStacks, x, _) D  = (GameField   , x + 3, 0)
+moveInDirection (GameField   , x, 0) U
+  | x >= 2                              = (EndingStacks, max (x - 3) 0, 0)
+  | otherwise                           = (Pile, 0, 0)
+moveInDirection (region, x, y) dir      = (region, x + dx, y + dy)
+    where (dx, dy) = dirToDelta dir
+
+-- Geeft een potentiele beweging (`from`, `onto`).
+-- De eerste kaart in de tupel: `from`, stelt de onderste kaart voor in de substapel die weggenomen wordt
+-- De tweede kaart in de tupel: `onto`, stelt de kaart voor waarop die substapel gelegd zal worden
+getPotentialMovement2 :: Coordinate -> Coordinate -> Board -> (Card, Card)
+getPotentialMovement2 from onto@(EndingStacks, _, _) b = (getLastFromCo from b, getCardFromCo onto b)
+getPotentialMovement2 from onto@(GameField   , _, _) b = (getCardFromCo from b, getLastFromCo onto b)
+getPotentialMovement2 from onto@(Pile        , _, _) b = error "Internal error: kan niet op Pile plaatsen."
+
+
 -- Of een bepaalde coordinaat zich in het gameVeld bevind (Dit gaat dus niet over de pile of endingstacks)
 isInGameField :: (Int, Int) -> [Stack] -> Bool
 isInGameField (x, y) gameField = containsHor && containsVer
@@ -23,10 +43,9 @@ isInGameField (x, y) gameField = containsHor && containsVer
           containsVer = y >= 0 && y < length stack
           stack = gameField !! x
 
-moveSubStack :: Coordinate -> Coordinate -> Game -> Game
-moveSubStack from to g@Game{board = b} = g{board = newBoard}
-    where newBoard = boardAfterPlacingStack to removed removedBoard
-          (removed, removedBoard) = takeStackAction from b 
+moveSubStack :: Coordinate -> Coordinate -> Board -> Board
+moveSubStack from to b = boardAfterPlacingStack to removed removedBoard
+    where (removed, removedBoard) = takeStackAction from b 
         
           
 -- Verwijder een substapel kaarten van het bord,

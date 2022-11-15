@@ -71,14 +71,3 @@ showLast :: Stack -> Stack
 showLast [] = [placeholderCard]
 showLast stack = init stack ++ [showCard $ last stack]
 
-moveSelectorPos :: Coordinate -> Direction -> Coordinate
-moveSelectorPos (Pile        , _, _) R  = (EndingStacks, 0, 0)
-moveSelectorPos (Pile        , _, _) D  = (GameField   , 0, 0)
-moveSelectorPos (EndingStacks, 0, _) L  = (Pile        , 0, 0)
-moveSelectorPos (EndingStacks, x, _) D  = (GameField   , x + 3, 0)
-moveSelectorPos (GameField   , x, 0) U
-  | x >= 2                              = (EndingStacks, max (x - 3) 0, 0)
-  | otherwise                           = (Pile, 0, 0)
-moveSelectorPos (region, x, y) dir      = (region, x + dx, y + dy)
-    where (dx, dy) = dirToDelta dir
-

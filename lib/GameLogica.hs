@@ -3,73 +3,82 @@ module GameLogica where
 import Types
 
 import SelectorLogica
-import PatienceLogica (moveSelectorPos, rotateStackNTimes)
-import BoardLogica (canMoveInDirection, moveSubStack, getCardFromCo, getLastFromCo)
+import PatienceLogica (rotateStackNTimes)
+import BoardLogica (canMoveInDirection, moveSubStack, getCardFromCo, getLastFromCo, moveInDirection, getPotentialMovement2)
 import Cards (canPerformMovement)
 
 import Data.Maybe (fromJust, isNothing)
+
+-- =================================================================
+-- ||                     Tussenfuncties                          ||
+-- =================================================================
    
--- Tussenfunctie voor properheid
+-- Tussenfunctie voor properheid:
+-- Roept handleSelection op met de selected-positie en de selector-positie
 handleGameSelection :: Game -> Game
-handleGameSelection g = handleSelection maybeSelected selectorPos g 
+handleGameSelection g = placeSelector maybeSelected selectorPos g 
       where (maybeSelected, selectorPos) = (getBothSelections . selector) g
+
+-- TussenFunctie evoor properheid
+canGamePlaceSelector :: Game -> Bool
+canGamePlaceSelector g@Game{selector = Selector{position = p, selected = s}} = canPlaceSelector p s g
+
+-- Tussenfunctie voor properheid
+-- roept `canPerformMovement` op vanuit de bordklasse. Geeft de regio mee en de potentielemovement 
+canGamePerformMovement :: Coordinate -> Game -> Bool
+canGamePerformMovement (region, _, _) = uncurry (canPerformMovement region) . getPotentialMovement
+
+-- Tussenfunctie voor properheid
+canGameSelect :: Game -> Bool
+canGameSelect = canSelect . getSelectedCard
+
+-- TussenFunctie voor properheid: vraagt aan selectormodule om te selecteren.
+gameSelect :: Game -> Game
+gameSelect g@Game{selector = s} = g{selector = select s}
+
+-- TussenFunctie voor properheid: vraagt aan selectormodule om te deselecteren.
+gameDeselect :: Game -> Game
+gameDeselect g@Game{selector = s} = g{selector = deselect s}
+
+-- =================================================================
+-- ||                     Volledige gamefuncties                  ||
+-- =================================================================
+
+-- Vraagt aan de boardmodule of er vanuit de positie van de selector in een bepaalde richting gegaan kan worden.
+canGameSelectorMove :: Game -> Direction -> Bool
+canGameSelectorMove g = canMoveInDirection selectorPos (board g)
+      where selectorPos = (position . selector) g
+
+-- Of de selector geplaatst kan worden. Er zijn twee mogelijkheden:
+-- 1. Er is nog geen kaart geselecteerd -> kan de huidge kaart geselecteerd worden?
+-- 2. Er is al een kaart geselecteerd   -> kan de verplaatsing gebeurden?
+canPlaceSelector :: Coordinate -> Maybe Coordinate -> Game -> Bool
+canPlaceSelector selectorPos Nothing  = canGameSelect
+canPlaceSelector selectorPos (Just _) = canGamePerformMovement selectorPos
 
 -- Selecteer een kaart wanneer er nog geen kaart selected was
 -- Doe een verplaatsing wanneer er wel al een selected was.
 -- De functie `canPlaceSelector` moet altijd voor deze functie opgeroepen worden 
 -- om te kijken of de zet wel mogelijk is of niet.
-handleSelection :: Maybe Coordinate -> Coordinate -> Game -> Game
-handleSelection Nothing            selectorPos = gameSelect 
-handleSelection (Just selectedPos) selectorPos = gameDeselect . moveSubStack selectedPos selectorPos
-            
--- Tussenfunctie voor properheid 
-canGameSelectorMove :: Game -> Direction -> Bool
-canGameSelectorMove g@Game{selector = s@Selector{position = selectorPos}} = canMoveInDirection selectorPos (board g)
+placeSelector :: Maybe Coordinate -> Coordinate -> Game -> Game
+placeSelector Nothing            selectorPos = gameSelect 
+placeSelector (Just selectedPos) selectorPos = gameDeselect . moveSubStack selectedPos selectorPos
 
--- TussenFunctie evoor properheid
-canGamePlaceSelector :: Game -> Bool
-canGamePlaceSelector g@Game{selector = Selector{position = p, selected = s}} = canPlaceSelector g p s
-
--- Of de selector geplaatst kan worden. Er zijn twee mogelijkheden:
--- 1. Er is nog geen kaart geselecteerd -> kan de huidge kaart geselecteerd worden?
--- 2. Er is al een kaart geselecteerd   -> kan de verplaatsing gebeurden?
-canPlaceSelector :: Game -> Coordinate -> Maybe Coordinate -> Bool
-canPlaceSelector g selectorPos    Nothing  = canGameSelect g
-canPlaceSelector g (region, _, _) (Just _) = canPerformMovement region from onto
-    where (from, onto) = getPotentialMovement g
-
--- Geeft een potentiele beweging (`from`, `onto`).
--- De eerste kaart in de tupel: `from`, stelt de onderste kaart voor in de substapel die weggenomen wordt
--- De tweede kaart in de tupel: `onto`, stelt de kaart voor waarop die substapel gelegd zal worden
-getPotentialMovement :: Game -> (Card, Card)
-getPotentialMovement g = (getCardFromCo (fromJust from) b, getLastFromCo onto b)
-    where (from, onto) = (getBothSelections . selector) g
-          b    = board g
--- Tussenfunctie voor properheid
-canGameSelect :: Game -> Bool
-canGameSelect = canSelect . getSelectedCard
+getPotentialMovement :: Game -> (Card, Card) 
+getPotentialMovement g = getPotentialMovement2 (fromJust selectedCo) selectorCo (board g)
+      where (selectedCo, selectorCo) = (getBothSelections . selector) g
 
 getSelectedCard :: Game -> Card
 getSelectedCard g = getCardFromCo co (board g)
       where co = (position . selector) g
 
--- TussenFunctie voor properheid
-gameSelect :: Game -> Game
-gameSelect g@Game{selector = s} = g{selector = select s}
-
--- TussenFunctie voor properheid
-gameDeselect :: Game -> Game
-gameDeselect g@Game{selector = s} = g{selector = deselect s}
-
 -- move de selector van de game
 move :: Game -> Direction -> Game
 move g@Game{selector = s} dir = g{selector = moveSelector s dir}
 
-
-
 -- Move de selector 
 moveSelector :: Selector -> Direction -> Selector
-moveSelector s@Selector{position = p} dir = s{position = moveSelectorPos p dir}
+moveSelector s@Selector{position = p} dir = s{position = moveInDirection p dir}
 
 
 rotatePile :: Game -> Game
