@@ -1,7 +1,6 @@
 module BoardLogica where
 
 import Types
-import PatienceLogica
 import Cards (placeholderCard, showCard, allCardsHidden, allShuffledCards)
 
 import Data.Maybe (fromJust)
