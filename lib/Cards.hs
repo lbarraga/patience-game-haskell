@@ -2,12 +2,36 @@ module Cards where
 
 import Types
 
+import System.Random.Shuffle (shuffle')
+import System.Random
+
+-- =================================================
+-- ||                  Constanten                 ||
+-- =================================================
+
+seed :: Int
+seed = 1
+
+-- | Alle kaarten
+allCardsHidden :: [Card]
+allCardsHidden = [(cardType, cardValue, Hidden) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]]
+
 allCardsShown :: [Card]
-allCardsShown = [(cardType, cardValue, Visible) | cardType <- [Clubs .. Spades], cardValue <- [Ace .. King]]
+allCardsShown = map showCard allCardsHidden
+
+allShuffledCards :: [Card]
+allShuffledCards = shuffleList allCardsHidden
 
 -- de placeholder kaart
 placeholderCard :: Card
 placeholderCard = (NoneType, NoneValue, NoneStatus)
+
+-- ================================================
+-- ||                 Hulp Functies              ||
+-- ================================================
+
+shuffleList :: [a] -> [a]
+shuffleList l = shuffle' l (length l) (mkStdGen seed)
 
 -- c1: de kaart die verplaatst word
 -- c2: de kaart waarop c1 geplaatst wordt.

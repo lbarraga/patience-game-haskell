@@ -6,8 +6,8 @@ build-type:     Simple
 
 library
   hs-source-dirs: lib
-  build-depends: base >= 4.7 && <5
-  exposed-modules: PatienceLogica, BoardLogica, SelectorLogica, GameLogica, Cards, Types
+  build-depends: base >= 4.7 && <5, random-shuffle >= 0.0.4, random >= 1.1 && < 1.4
+  exposed-modules: BoardLogica, SelectorLogica, GameLogica, Cards, Types
 
 executable patience
   main-is: Main.hs

@@ -3,11 +3,18 @@ module GameLogica where
 import Types
 
 import SelectorLogica
-import PatienceLogica (rotateStackNTimes)
-import BoardLogica (canMoveInDirection, moveSubStack, getCardFromCo, getLastFromCo, moveInDirection, getPotentialMovement2)
+import BoardLogica (initBoard, canMoveInDirection, moveSubStack, getCardFromCo, getLastFromCo, moveInDirection, getPotentialMovement)
 import Cards (canPerformMovement)
 
 import Data.Maybe (fromJust, isNothing)
+
+-- =================================================================
+-- ||                       Constanten                            ||
+-- =================================================================
+
+-- Initiele opstelling van de game
+initGame :: Game
+initGame = Game {board = initBoard, selector = initSelector}
 
 -- =================================================================
 -- ||                     Tussenfuncties                          ||
@@ -26,7 +33,7 @@ canGamePlaceSelector g@Game{selector = Selector{position = p, selected = s}} = c
 -- Tussenfunctie voor properheid
 -- roept `canPerformMovement` op vanuit de bordklasse. Geeft de regio mee en de potentielemovement 
 canGamePerformMovement :: Coordinate -> Game -> Bool
-canGamePerformMovement (region, _, _) = uncurry (canPerformMovement region) . getPotentialMovement
+canGamePerformMovement (region, _, _) = uncurry (canPerformMovement region) . getPotentialMovementGame
 
 -- Tussenfunctie voor properheid
 canGameSelect :: Game -> Bool
@@ -68,8 +75,8 @@ placeSelector :: Maybe Coordinate -> Coordinate -> Game -> Game
 placeSelector Nothing            selectorPos = gameSelect
 placeSelector (Just selectedPos) selectorPos = gameDeselect . moveGameSubstack selectedPos selectorPos
 
-getPotentialMovement :: Game -> (Card, Card) 
-getPotentialMovement g = getPotentialMovement2 (fromJust selectedCo) selectorCo (board g)
+getPotentialMovementGame :: Game -> (Card, Card) 
+getPotentialMovementGame g = getPotentialMovement (fromJust selectedCo) selectorCo (board g)
       where (selectedCo, selectorCo) = (getBothSelections . selector) g
 
 getSelectedCard :: Game -> Card
@@ -89,6 +96,10 @@ rotatePile :: Game -> Game
 rotatePile g@Game{board = b@Board{pile = p}} = g{ board = b{pile = newPile}}
     where newPile = rotateStackNTimes p 2
 
+rotateStackNTimes :: Stack -> Int -> Stack
+rotateStackNTimes [] _     = []
+rotateStackNTimes l 0      = l
+rotateStackNTimes (x:xs) n = rotateStackNTimes (xs ++ [x]) (n - 1)
 
 
 

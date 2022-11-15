@@ -1,12 +1,30 @@
 module SelectorLogica where
 
 import Types
-import PatienceLogica (nEndingStacks, nSpeelVeldStapels)
 import Cards (canPerformMovement, isVisible)
 
 
 import Data.Maybe (isNothing, fromJust)
 
+-- ================================================
+-- ||                Constanten                  ||
+-- ================================================
+
+-- De initiele positie van de selector
+initSelectorPos :: Coordinate
+initSelectorPos = (Pile, 0, 0)
+
+-- De initiele positie van selected
+initSelected :: Maybe Coordinate
+initSelected = Nothing
+
+-- Initiele staat van de selector.
+initSelector :: Selector
+initSelector = Selector {position = initSelectorPos, selected = initSelected}
+
+-- ================================================
+-- ||                Functies                    ||
+-- ================================================
 -- Selecteer de kaart onder de selector
 select :: Selector -> Selector
 select s@Selector{position = selectorPosition} = s{selected = Just selectorPosition}

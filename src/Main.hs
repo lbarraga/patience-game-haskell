@@ -1,6 +1,5 @@
-import PatienceLogica (initGame)
 import Cards (placeholderCard, allCardsShown, isVisible, canPerformMovement)
-import GameLogica (move, canGamePlaceSelector, handleGameSelection, rotatePile, canGameSelectorMove, gameDeselect)
+import GameLogica (initGame, move, canGamePlaceSelector, handleGameSelection, rotatePile, canGameSelectorMove, gameDeselect)
 import Types
 
 import Graphics.Gloss.Interface.IO.Game
