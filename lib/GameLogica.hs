@@ -40,6 +40,10 @@ gameSelect g@Game{selector = s} = g{selector = select s}
 gameDeselect :: Game -> Game
 gameDeselect g@Game{selector = s} = g{selector = deselect s}
 
+-- tussenFunctie voor properheid
+moveGameSubstack :: Coordinate -> Coordinate -> Game -> Game
+moveGameSubstack selectedPos selectorPos g@Game{board = b} = g{board = moveSubStack selectedPos selectorPos b}
+
 -- =================================================================
 -- ||                     Volledige gamefuncties                  ||
 -- =================================================================
@@ -61,8 +65,8 @@ canPlaceSelector selectorPos (Just _) = canGamePerformMovement selectorPos
 -- De functie `canPlaceSelector` moet altijd voor deze functie opgeroepen worden 
 -- om te kijken of de zet wel mogelijk is of niet.
 placeSelector :: Maybe Coordinate -> Coordinate -> Game -> Game
-placeSelector Nothing            selectorPos = gameSelect 
-placeSelector (Just selectedPos) selectorPos = gameDeselect . moveSubStack selectedPos selectorPos
+placeSelector Nothing            selectorPos = gameSelect
+placeSelector (Just selectedPos) selectorPos = gameDeselect . moveGameSubstack selectedPos selectorPos
 
 getPotentialMovement :: Game -> (Card, Card) 
 getPotentialMovement g = getPotentialMovement2 (fromJust selectedCo) selectorCo (board g)
