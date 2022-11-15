@@ -9,3 +9,9 @@ main = hspec $ do
 
     it "Returns correct string for hallo" $ do
         hallo `shouldBe` "Hallo"
+    it "Returns correct string for hallo" $ do
+        hallo `shouldBe` "Hallo"
+    it "Returns correct string for hallo" $ do
+        hallo `shouldBe` "Hallo"
+    it "Returns correct string for hallo" $ do
+        hallo `shouldBe` "Hallo"
